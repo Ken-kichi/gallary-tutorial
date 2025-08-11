@@ -35,10 +35,18 @@ resource "azurerm_linux_web_app" "galleryapp" {
   location            = azurerm_service_plan.gallery_plan.location
   service_plan_id     = azurerm_service_plan.gallery_plan.id
 
+  identity {
+    type = "SystemAssigned"
+  }
+
   site_config {}
 }
 
-
+resource "azurerm_role_assignment" "storage_blob_contributor" {
+  scope                = azurerm_storage_account.gallery_storage.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
 resource "azurerm_container_registry" "acr" {
   name                = "galleryacr${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.gallery_rg.name
@@ -55,6 +63,12 @@ resource "azurerm_storage_account" "gallery_storage" {
   location                 = azurerm_resource_group.gallery_rg.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
+}
+
+resource "azurerm_storage_container" "images" {
+  name                  = "images"
+  storage_account_id    = azurerm_storage_account.gallery_storage.id
+  container_access_type = "blob"
 }
 
 
@@ -91,15 +105,5 @@ resource "azurerm_key_vault" "this" {
       "Create"
     ]
   }
-}
-
-
-resource "azurerm_key_vault_access_policy" "app_service_access" {
-  key_vault_id = azurerm_key_vault.this.id
-
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = data.azurerm_client_config.current.object_id
-
-  secret_permissions = ["Get", "List"]
 }
 
