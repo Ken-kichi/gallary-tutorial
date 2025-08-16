@@ -24,13 +24,13 @@ resource "azurerm_service_plan" "gallery_plan" {
 }
 
 resource "random_string" "suffix" {
-  length = 6
-  upper = false
+  length  = 6
+  upper   = false
   special = false
 }
 
 resource "azurerm_linux_web_app" "galleryapp" {
-  name                = "galleryacr${random_string.suffix.result}"
+  name                = "galleryapp${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.gallery_rg.name
   location            = azurerm_service_plan.gallery_plan.location
   service_plan_id     = azurerm_service_plan.gallery_plan.id
@@ -39,14 +39,29 @@ resource "azurerm_linux_web_app" "galleryapp" {
     type = "SystemAssigned"
   }
 
-  site_config {}
+ site_config {
+    application_stack {
+      docker_image_name   = "galleryacrqjoaln.azurecr.io/fastapi-app:latest"
+      docker_registry_url = "https://galleryacrqjoaln.azurecr.io"
+    }
+
+    container_registry_use_managed_identity = true
+  }
+
+  app_settings = {
+    WEBSITES_ENABLE_APP_SERVICE_STORAGE = false
+    WEBSITES_PORT                      = "8000"
+  }
+
 }
 
-resource "azurerm_role_assignment" "storage_blob_contributor" {
-  scope                = azurerm_storage_account.gallery_storage.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = data.azurerm_client_config.current.object_id
+resource "azurerm_role_assignment" "acr_pull" {
+  scope                = azurerm_container_registry.acr.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_linux_web_app.galleryapp.identity[0].principal_id
 }
+
+
 resource "azurerm_container_registry" "acr" {
   name                = "galleryacr${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.gallery_rg.name
@@ -71,13 +86,19 @@ resource "azurerm_storage_container" "images" {
   container_access_type = "blob"
 }
 
+resource "azurerm_role_assignment" "storage_blob_contributor" {
+  scope                = azurerm_storage_account.gallery_storage.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_linux_web_app.galleryapp.identity[0].principal_id
+}
+
 
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "this" {
   name                = "gallery-kv${random_string.suffix.result}"
-  resource_group_name      = azurerm_resource_group.gallery_rg.name
-  location                 = azurerm_resource_group.gallery_rg.location
+  resource_group_name = azurerm_resource_group.gallery_rg.name
+  location            = azurerm_resource_group.gallery_rg.location
   tenant_id           = data.azurerm_client_config.current.tenant_id
 
   sku_name = "standard"
@@ -87,7 +108,7 @@ resource "azurerm_key_vault" "this" {
 
   access_policy {
     tenant_id = data.azurerm_client_config.current.tenant_id
-    object_id = data.azurerm_client_config.current.object_id
+    object_id = azurerm_linux_web_app.galleryapp.identity[0].principal_id
 
 
     secret_permissions = [
