@@ -1,23 +1,38 @@
-import os, uuid
+import os, uuid,io
 from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
 from azure.storage.blob import (
     BlobServiceClient,
     BlobProperties,
     ContainerProperties,
     ContainerClient
     )
-from dotenv import load_dotenv
-
-load_dotenv()
+from PIL import Image
+from typing import Union, BinaryIO
 
 class BlobStorage:
     def __init__(self)->None:
-        self.account_url = os.getenv("ACCOUNT_URL")
         self.default_credential = DefaultAzureCredential()
+        self.client = SecretClient(vault_url="https://gallery-kvey233k.vault.azure.net/", credential=self.default_credential)
+        self.account_url = self.client.get_secret("ACCOUNT-URL").value
+        self.container_name = self.client.get_secret("CONTAINER-NAME").value
         self.blob_service_client = BlobServiceClient(self.account_url, credential=self.default_credential)
+
+    def get_account_url(self)->str:
+        return self.client.get_secret("ACCOUNT-URL").value
+
+    def get_container_name(self)->str:
+        return self.client.get_secret("CONTAINER-NAME").value
 
     def get_uuid(self)->str:
         return str(uuid.uuid4())
+
+    def square_image(self, image_source: Union[str, BinaryIO]) -> Image.Image:
+        with Image.open(image_source) as img:
+            size = max(img.size)
+            new_img = Image.new("RGB", (size, size), (255, 255, 255))
+            new_img.paste(img, ((size - img.width) // 2, (size - img.height) // 2))
+            return new_img
 
     # コンテナーの作成
     def create_container(self,container_name:str)->ContainerClient:
@@ -52,7 +67,7 @@ class BlobStorage:
 
 def main():
     blob_storage = BlobStorage()
-    list_blobs = blob_storage.list_blobs(container_name="images")
+    list_blobs = blob_storage.list_blobs(container_name=self.container_name)
     for blob in list_blobs:
         print(blob.name)
 
