@@ -9,26 +9,30 @@ provider "azurerm" {
   subscription_id = var.subscription_id
 }
 
-resource "azurerm_resource_group" "gallery_rg" {
-  name     = var.name
-  location = var.location
-}
-
-
-resource "azurerm_service_plan" "gallery_plan" {
-  name                = "gallery_plan"
-  resource_group_name = azurerm_resource_group.gallery_rg.name
-  location            = azurerm_resource_group.gallery_rg.location
-  os_type             = "Linux"
-  sku_name            = "P1v2"
-}
-
 resource "random_string" "suffix" {
   length  = 6
   upper   = false
   special = false
 }
 
+data "azurerm_client_config" "current" {}
+
+# リソースグループ
+resource "azurerm_resource_group" "gallery_rg" {
+  name     = var.name
+  location = var.location
+}
+
+# App Service　Plan
+resource "azurerm_service_plan" "gallery_plan" {
+  name                = "gallery_plan"
+  resource_group_name = azurerm_resource_group.gallery_rg.name
+  location            = azurerm_resource_group.gallery_rg.location
+  os_type             = "Linux"
+  sku_name            = "B1"
+}
+
+# App Service
 resource "azurerm_linux_web_app" "galleryapp" {
   name                = "galleryapp${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.gallery_rg.name
@@ -39,19 +43,26 @@ resource "azurerm_linux_web_app" "galleryapp" {
     type = "SystemAssigned"
   }
 
- site_config {
-    application_stack {
-      docker_image_name   = "galleryacrqjoaln.azurecr.io/fastapi-app:latest"
-      docker_registry_url = "https://galleryacrqjoaln.azurecr.io"
-    }
-
+  site_config {
     container_registry_use_managed_identity = true
+    # Linux コンテナ用のコマンドが必要なら app_command_line をここに
   }
 
   app_settings = {
-    WEBSITES_ENABLE_APP_SERVICE_STORAGE = false
-    WEBSITES_PORT                      = "8000"
+    "DOCKER_CUSTOM_IMAGE_NAME" = "galleryacrqjoaln.azurecr.io/fastapi-app:latest"
+    # DOCKER_REGISTRY_SERVER_URL は不要
   }
+}
+
+
+
+# Container Registry
+resource "azurerm_container_registry" "acr" {
+  name                = "galleryacr${random_string.suffix.result}"
+  resource_group_name = azurerm_resource_group.gallery_rg.name
+  location            = azurerm_resource_group.gallery_rg.location
+  sku                 = "Basic"
+  admin_enabled       = true
 
 }
 
@@ -61,17 +72,7 @@ resource "azurerm_role_assignment" "acr_pull" {
   principal_id         = azurerm_linux_web_app.galleryapp.identity[0].principal_id
 }
 
-
-resource "azurerm_container_registry" "acr" {
-  name                = "galleryacr${random_string.suffix.result}"
-  resource_group_name = azurerm_resource_group.gallery_rg.name
-  location            = azurerm_resource_group.gallery_rg.location
-  sku                 = "Premium"
-  admin_enabled       = false
-
-}
-
-
+# Storage Account
 resource "azurerm_storage_account" "gallery_storage" {
   name                     = "galleryst${random_string.suffix.result}"
   resource_group_name      = azurerm_resource_group.gallery_rg.name
@@ -90,41 +91,5 @@ resource "azurerm_role_assignment" "storage_blob_contributor" {
   scope                = azurerm_storage_account.gallery_storage.id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_linux_web_app.galleryapp.identity[0].principal_id
-}
-
-
-data "azurerm_client_config" "current" {}
-
-resource "azurerm_key_vault" "this" {
-  name                = "gallery-kv${random_string.suffix.result}"
-  resource_group_name = azurerm_resource_group.gallery_rg.name
-  location            = azurerm_resource_group.gallery_rg.location
-  tenant_id           = data.azurerm_client_config.current.tenant_id
-
-  sku_name = "standard"
-
-  purge_protection_enabled = true
-
-
-  access_policy {
-    tenant_id = data.azurerm_client_config.current.tenant_id
-    object_id = azurerm_linux_web_app.galleryapp.identity[0].principal_id
-
-
-    secret_permissions = [
-      "Get",
-      "Set",
-      "Delete",
-      "List"
-    ]
-
-    # 鍵に対する許可（暗号化・署名などに利用）
-    key_permissions = [
-      "Get",
-      "List",
-      "Update",
-      "Create"
-    ]
-  }
 }
 
