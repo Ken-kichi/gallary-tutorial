@@ -13,16 +13,15 @@ from typing import Union, BinaryIO
 class BlobStorage:
     def __init__(self)->None:
         self.default_credential = DefaultAzureCredential()
-        self.client = SecretClient(vault_url="https://gallery-kvey233k.vault.azure.net/", credential=self.default_credential)
-        self.account_url = self.client.get_secret("ACCOUNT-URL").value
-        self.container_name = self.client.get_secret("CONTAINER-NAME").value
+        self.account_url = "https://gallerystqjoaln.blob.core.windows.net"
+        self.container_name = "images"
         self.blob_service_client = BlobServiceClient(self.account_url, credential=self.default_credential)
 
     def get_account_url(self)->str:
-        return self.client.get_secret("ACCOUNT-URL").value
+        return self.account_url
 
     def get_container_name(self)->str:
-        return self.client.get_secret("CONTAINER-NAME").value
+        return self.container_name
 
     def get_uuid(self)->str:
         return str(uuid.uuid4())

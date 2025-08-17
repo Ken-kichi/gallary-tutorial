@@ -11,6 +11,10 @@ CONTAINER_NAME = blob_storage_cls.get_container_name()
 
 app = FastAPI()
 
+@app.get("/")
+def get_root():
+    return {"message":"Hello World"}
+
 # 一覧API
 @app.get("/items")
 def get_items():
