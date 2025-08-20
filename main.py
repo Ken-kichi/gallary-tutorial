@@ -3,6 +3,7 @@ from fastapi import FastAPI, File, UploadFile
 from model import OutputItem
 from blob_storage import BlobStorage
 from datetime import timezone, timedelta
+from fastapi.middleware.cors import CORSMiddleware
 
 blob_storage_cls = BlobStorage()
 
@@ -10,6 +11,14 @@ ACCOUNT_URL = blob_storage_cls.get_account_url()
 CONTAINER_NAME = blob_storage_cls.get_container_name()
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def get_root():

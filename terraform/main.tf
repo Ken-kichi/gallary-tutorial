@@ -45,12 +45,11 @@ resource "azurerm_linux_web_app" "galleryapp" {
 
   site_config {
     container_registry_use_managed_identity = true
-    # Linux コンテナ用のコマンドが必要なら app_command_line をここに
+
   }
 
   app_settings = {
     "DOCKER_CUSTOM_IMAGE_NAME" = "galleryacrqjoaln.azurecr.io/fastapi-app:latest"
-    # DOCKER_REGISTRY_SERVER_URL は不要
   }
 }
 
