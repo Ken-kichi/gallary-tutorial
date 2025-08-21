@@ -26,13 +26,6 @@ class BlobStorage:
     def get_uuid(self)->str:
         return str(uuid.uuid4())
 
-    def square_image(self, image_source: Union[str, BinaryIO]) -> Image.Image:
-        with Image.open(image_source) as img:
-            size = max(img.size)
-            new_img = Image.new("RGB", (size, size), (255, 255, 255))
-            new_img.paste(img, ((size - img.width) // 2, (size - img.height) // 2))
-            return new_img
-
     # コンテナーの作成
     def create_container(self,container_name:str)->ContainerClient:
         container_client = self.blob_service_client.create_container(container_name)

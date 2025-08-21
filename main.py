@@ -49,17 +49,18 @@ def get_item(item_id: str):
 @app.post("/items")
 async def create_item(file: UploadFile = File(...)):
     try:
+        # ファイルの中身を読み込み
         data = await file.read()
-        img_stream = io.BytesIO(data)
-        square_img = blob_storage_cls.square_image(img_stream)
-        upload_file_name = f"{blob_storage_cls.get_uuid()}.{file.filename.split('.')[-1]}"
-        output_stream = io.BytesIO()
-        square_img.save(output_stream, format=file.content_type.split('/')[-1])
-        output_stream.seek(0)
+
+        # 拡張子を維持してファイル名生成
+        ext = file.filename.split('.')[-1]
+        upload_file_name = f"{blob_storage_cls.get_uuid()}.{ext}"
+
+        # Blob にアップロード
         blob_storage_cls.upload_blob(
             container_name=CONTAINER_NAME,
             upload_file_name=upload_file_name,
-            data=output_stream.getvalue()
+            data=data
         )
 
         return {
@@ -69,7 +70,6 @@ async def create_item(file: UploadFile = File(...)):
         }
     except Exception as e:
         return {"message": "Failed", "error": str(e)}
-
 # 削除API
 @app.delete("/items/{item_name:str}")
 def delete_item(item_name: str):
