@@ -46,13 +46,33 @@ resource "azurerm_linux_web_app" "galleryapp" {
   site_config {
     container_registry_use_managed_identity = true
 
-  }
-
-  app_settings = {
-    "DOCKER_CUSTOM_IMAGE_NAME" = "galleryacrqjoaln.azurecr.io/fastapi-app:latest"
+    application_stack {
+      docker_image_name   = "fastapi-app:latest"
+      docker_registry_url = "https://${azurerm_container_registry.acr.login_server}"
+    }
   }
 }
 
+
+resource "azurerm_linux_web_app" "frontapp" {
+  name                = "frontapp${random_string.suffix.result}"
+  resource_group_name = azurerm_resource_group.gallery_rg.name
+  location            = azurerm_service_plan.gallery_plan.location
+  service_plan_id     = azurerm_service_plan.gallery_plan.id
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    container_registry_use_managed_identity = true
+
+    application_stack {
+      docker_image_name   = "nextjs-app:latest"
+      docker_registry_url = "https://${azurerm_container_registry.acr.login_server}"
+    }
+  }
+}
 
 
 # Container Registry
@@ -69,6 +89,12 @@ resource "azurerm_role_assignment" "acr_pull" {
   scope                = azurerm_container_registry.acr.id
   role_definition_name = "AcrPull"
   principal_id         = azurerm_linux_web_app.galleryapp.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "acr_pull_frontend" {
+  scope                = azurerm_container_registry.acr.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_linux_web_app.frontapp.identity[0].principal_id
 }
 
 # Storage Account
